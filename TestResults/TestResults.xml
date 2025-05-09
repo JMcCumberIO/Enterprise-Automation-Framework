@@ -1,0 +1,89 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<test-results xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="nunit_schema_2.5.xsd" name="Pester" total="8" errors="0" failures="8" not-run="0" inconclusive="0" ignored="0" skipped="0" invalid="0" date="2025-05-08" time="13:26:59">
+  <environment clr-version="4.0.30319.42000" user-domain="GRAGNOK" cwd="C:\Users\xombi\Documents\Projects\EAF" platform="Microsoft Windows 11 Pro|C:\WINDOWS|\Device\Harddisk1\Partition3" machine-name="GRAGNOK" nunit-version="2.5.8.0" os-version="10.0.26120" user="xombi" />
+  <culture-info current-culture="en-US" current-uiculture="en-US" />
+  <test-suite type="TestFixture" name="Pester" executed="True" result="Failure" success="False" time="173.7276" asserts="0" description="Pester">
+    <results>
+      <test-suite type="TestFixture" name="C:\Users\xombi\Documents\Projects\EAF\EAF.AzureProvisioning\Tests\Integration\AppService.Tests.ps1" executed="True" result="Failure" success="False" time="3.9245" asserts="0" description="C:\Users\xombi\Documents\Projects\EAF\EAF.AzureProvisioning\Tests\Integration\AppService.Tests.ps1">
+        <results>
+          <test-suite type="TestFixture" name="EAF App Service Deployment" executed="True" result="Failure" success="False" time="1.0125" asserts="0" description="EAF App Service Deployment">
+            <results>
+              <test-case description="Should deploy an App Service with the correct name" name="EAF App Service Deployment.Should deploy an App Service with the correct name" time="0.0756" asserts="0" success="False" result="Failure" executed="True">
+                <failure>
+                  <message />
+                  <stack-trace />
+                </failure>
+              </test-case>
+              <test-case description="Should be in the correct location" name="EAF App Service Deployment.Should be in the correct location" time="0" asserts="0" success="False" result="Failure" executed="True">
+                <failure>
+                  <message>This test should run but it did not. Most likely a setup in some parent block failed.</message>
+                  <stack-trace />
+                </failure>
+              </test-case>
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+      <test-suite type="TestFixture" name="C:\Users\xombi\Documents\Projects\EAF\EAF.AzureProvisioning\Tests\Integration\KeyVault.Tests.ps1" executed="True" result="Failure" success="False" time="0.3841" asserts="0" description="C:\Users\xombi\Documents\Projects\EAF\EAF.AzureProvisioning\Tests\Integration\KeyVault.Tests.ps1">
+        <results>
+          <test-suite type="TestFixture" name="EAF Key Vault Deployment" executed="True" result="Failure" success="False" time="0.1702" asserts="0" description="EAF Key Vault Deployment">
+            <results>
+              <test-case description="Should deploy a Key Vault with the correct name" name="EAF Key Vault Deployment.Should deploy a Key Vault with the correct name" time="0.0493" asserts="0" success="False" result="Failure" executed="True">
+                <failure>
+                  <message />
+                  <stack-trace />
+                </failure>
+              </test-case>
+              <test-case description="Should be in the correct location" name="EAF Key Vault Deployment.Should be in the correct location" time="0" asserts="0" success="False" result="Failure" executed="True">
+                <failure>
+                  <message>This test should run but it did not. Most likely a setup in some parent block failed.</message>
+                  <stack-trace />
+                </failure>
+              </test-case>
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+      <test-suite type="TestFixture" name="C:\Users\xombi\Documents\Projects\EAF\EAF.AzureProvisioning\Tests\Integration\Storage.Tests.ps1" executed="True" result="Failure" success="False" time="0.3252" asserts="0" description="C:\Users\xombi\Documents\Projects\EAF\EAF.AzureProvisioning\Tests\Integration\Storage.Tests.ps1">
+        <results>
+          <test-suite type="TestFixture" name="EAF Storage Account Deployment" executed="True" result="Failure" success="False" time="0.128" asserts="0" description="EAF Storage Account Deployment">
+            <results>
+              <test-case description="Should deploy a Storage Account with the correct name" name="EAF Storage Account Deployment.Should deploy a Storage Account with the correct name" time="0.0349" asserts="0" success="False" result="Failure" executed="True">
+                <failure>
+                  <message />
+                  <stack-trace />
+                </failure>
+              </test-case>
+              <test-case description="Should have the correct SKU" name="EAF Storage Account Deployment.Should have the correct SKU" time="0" asserts="0" success="False" result="Failure" executed="True">
+                <failure>
+                  <message>This test should run but it did not. Most likely a setup in some parent block failed.</message>
+                  <stack-trace />
+                </failure>
+              </test-case>
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+      <test-suite type="TestFixture" name="C:\Users\xombi\Documents\Projects\EAF\EAF.AzureProvisioning\Tests\Integration\VM.Tests.ps1" executed="True" result="Failure" success="False" time="0.3158" asserts="0" description="C:\Users\xombi\Documents\Projects\EAF\EAF.AzureProvisioning\Tests\Integration\VM.Tests.ps1">
+        <results>
+          <test-suite type="TestFixture" name="EAF VM Deployment" executed="True" result="Failure" success="False" time="0.1416" asserts="0" description="EAF VM Deployment">
+            <results>
+              <test-case description="Should deploy a VM with the correct name" name="EAF VM Deployment.Should deploy a VM with the correct name" time="0.0349" asserts="0" success="False" result="Failure" executed="True">
+                <failure>
+                  <message />
+                  <stack-trace />
+                </failure>
+              </test-case>
+              <test-case description="Should have the correct size" name="EAF VM Deployment.Should have the correct size" time="0" asserts="0" success="False" result="Failure" executed="True">
+                <failure>
+                  <message>This test should run but it did not. Most likely a setup in some parent block failed.</message>
+                  <stack-trace />
+                </failure>
+              </test-case>
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+    </results>
+  </test-suite>
+</test-results>

@@ -1,0 +1,5 @@
+{
+    "VaultName": "mock-keyvault",
+    "ResourceGroupName": "mock-rg",
+    "Location": "eastus"
+}

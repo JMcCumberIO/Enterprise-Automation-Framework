@@ -1,0 +1,5 @@
+{
+    "appServiceName": "eaf-appservice-test",
+    "resourceGroup": "eaf-test-rg",
+    "location": "eastus"
+}

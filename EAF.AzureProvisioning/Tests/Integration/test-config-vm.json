@@ -1,0 +1,5 @@
+{
+    "vmName": "eaf-vm-test",
+    "resourceGroup": "eaf-test-rg",
+    "vmSize": "Standard_B2s"
+}

@@ -1,0 +1,5 @@
+{
+    "Name": "mock-appservice",
+    "ResourceGroupName": "mock-rg",
+    "Location": "eastus"
+}

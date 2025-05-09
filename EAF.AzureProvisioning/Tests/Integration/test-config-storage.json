@@ -1,0 +1,5 @@
+{
+    "storageAccountName": "eafstoragetest",
+    "resourceGroup": "eaf-test-rg",
+    "sku": "Standard_LRS"
+}

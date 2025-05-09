@@ -1,0 +1,5 @@
+{
+    "StorageAccountName": "mockstorage",
+    "ResourceGroupName": "mock-rg",
+    "Sku": { "Name": "Standard_LRS" }
+}

@@ -1,0 +1,146 @@
+{
+    "LoadTest": {
+        "EnableLongRunningTests": true,
+        "EnableNetworkTests": true,
+        "EnableAdvancedNetworkTests": true,
+        "ConcurrentOperations": {
+            "ReadThreads": 10,
+            "WriteThreads": 10,
+            "MaxConcurrentJobs": 20,
+            "TimeoutSeconds": 300
+        },
+        "NetworkSimulation": {
+            "DNS": {
+                "FailureRate": 0.2,
+                "TimeoutRate": 0.1,
+                "InvalidResponseRate": 0.1,
+                "MaxRetries": 3,
+                "RetryDelaySeconds": 2
+            },
+            "SSL": {
+                "CertificateErrorRate": 0.15,
+                "ProtocolErrorRate": 0.1,
+                "RevokedCertRate": 0.05,
+                "ValidateRevocation": true,
+                "AllowedProtocols": ["Tls12", "Tls13"],
+                "CertificateValidationMode": "Standard"
+            },
+            "Proxy": {
+                "Enabled": true,
+                "AuthErrorRate": 0.2,
+                "TimeoutRate": 0.1,
+                "BlockedRate": 0.1,
+                "ProxyServer": "http://proxy.internal:8080",
+                "BypassList": [
+                    "*.internal.com",
+                    "localhost"
+                ],
+                "AuthenticationTypes": [
+                    "Basic",
+                    "NTLM"
+                ]
+            },
+            "NetworkStack": {
+                "ErrorRate": 0.2,
+                "DelayRangeMs": {
+                    "Min": 100,
+                    "Max": 1000
+                },
+                "ConnectionPoolSize": 100,
+                "KeepAliveTime": 300,
+                "MaxServicePoints": 50
+            }
+        },
+        "ErrorSimulation": {
+            "ErrorRate": 0.1,
+            "ErrorTypes": [
+                "Timeout",
+                "AccessDenied",
+                "NetworkError",
+                "ThrottlingError"
+            ],
+            "RecoveryAttempts": 3,
+            "MinSuccessRate": 0.8
+        },
+        "PerformanceThresholds": {
+            "SingleOperation": {
+                "Write": {
+                    "MaxDurationMs": 1000,
+                    "TargetDurationMs": 500,
+                    "LatencyThresholdMs": 200
+                },
+                "Read": {
+                    "MaxDurationMs": 500,
+                    "TargetDurationMs": 200,
+                    "LatencyThresholdMs": 100
+                }
+            },
+            "BulkOperation": {
+                "Write": {
+                    "MaxDurationMs": 5000,
+                    "TargetDurationMs": 2000,
+                    "LatencyThresholdMs": 1000
+                },
+                "Read": {
+                    "MaxDurationMs": 2000,
+                    "TargetDurationMs": 1000,
+                    "LatencyThresholdMs": 500
+                }
+            },
+            "NetworkMetrics": {
+                "DNS": {
+                    "ResolutionTimeMs": 100,
+                    "MaxFailureRate": 0.1
+                },
+                "SSL": {
+                    "HandshakeTimeMs": 200,
+                    "MaxNegotiationFailureRate": 0.05
+                },
+                "Proxy": {
+                    "ConnectionTimeMs": 150,
+                    "MaxAuthFailureRate": 0.1
+                },
+                "NetworkStack": {
+                    "MaxErrorRate": 0.15,
+                    "MinThroughputKBps": 500
+                }
+            }
+        },
+        "Monitoring": {
+            "MetricsEnabled": true,
+            "DetailedLogging": true,
+            "CollectMemoryMetrics": true,
+            "CollectCpuMetrics": true,
+            "CollectNetworkMetrics": true,
+            "SamplingIntervalMs": 1000,
+            "AlertThresholds": {
+                "DNS": {
+                    "ResolutionFailureCount": 5,
+                    "MaxResolutionTimeMs": 500
+                },
+                "SSL": {
+                    "CertificateErrorCount": 3,
+                    "ProtocolErrorCount": 3
+                },
+                "Proxy": {
+                    "AuthFailureCount": 5,
+                    "ConnectionTimeoutCount": 3
+                },
+                "NetworkStack": {
+                    "ErrorCount": 10,
+                    "MaxLatencyMs": 2000
+                }
+            }
+        },
+        "Reports": {
+            "GenerateHtml": true,
+            "GenerateCsv": true,
+            "IncludeCharts": true,
+            "RetentionDays": 30,
+            "OutputPath": "TestResults/LoadTests",
+            "DetailedNetworkAnalysis": true,
+            "IncludeStackTrace": true,
+            "GroupByErrorType": true
+        }
+    }
+}

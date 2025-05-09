@@ -1,0 +1,5 @@
+{
+    "Name": "mock-vm",
+    "ResourceGroupName": "mock-rg",
+    "HardwareProfile": { "VmSize": "Standard_B2s" }
+}
