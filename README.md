@@ -9,13 +9,13 @@ Key Features
 
 Repository Structure
 plaintext
-
+```
 ├── /Scripts/           # PowerShell scripts for automation tasks
 ├── /Templates/         # Bicep templates for cloud infrastructure
 ├── /HTML/              # HTML files for web-based components
 ├── /Docs/              # Documentation and guides
 └── README.md           # Overview of the repository
-
+```
 Prerequisites
 
 To get started, ensure you have the following installed:
