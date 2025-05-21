@@ -22,11 +22,13 @@ Welcome to the Enterprise Azure Framework (EAF) Azure Provisioning module reposi
 
 ## Repository Structure
 
+This repository is structured as a PowerShell module. When cloned, the `EAF.AzureProvisioning` directory at the root is the module itself.
+
 ```
-EAF.AzureProvisioning/
+EAF.AzureProvisioning/      # Root of the PowerShell module
 ├── EAF.AzureProvisioning.psd1     # Module Manifest
 ├── EAF.AzureProvisioning.psm1     # Main Module Script (loader)
-├── Private/                       # Private helper modules (PowerShell)
+├── Private/                       # Private helper PowerShell modules and functions
 │   ├── configuration-helpers.psm1
 │   ├── configuration-monitoring-helpers.psm1
 │   ├── exceptions.psm1
@@ -34,31 +36,25 @@ EAF.AzureProvisioning/
 │   ├── retry-logic.psm1
 │   ├── secure-configuration-helpers.psm1
 │   └── validation-helpers.psm1
-├── Public/                        # Public PowerShell cmdlets
+├── Public/                        # Public PowerShell cmdlets (exported functions)
 │   ├── New-EAFAppService.ps1
 │   ├── New-EAFKeyVault.ps1
 │   ├── New-EAFStorageAccount.ps1
 │   └── New-EAFVM.ps1
-├── Templates/                     # Bicep templates
+├── Templates/                     # Bicep templates used by the cmdlets
 │   ├── appService.bicep
 │   ├── keyVault.bicep
 │   ├── storage.bicep
 │   └── vm.bicep
 ├── Tests/                         # Pester tests
 │   ├── Unit/                      # Unit tests for PowerShell scripts
-│   │   ├── New-EAFAppService.Unit.Tests.ps1
-│   │   ├── New-EAFKeyVault.Unit.Tests.ps1
-│   │   ├── New-EAFStorageAccount.Unit.Tests.ps1
-│   │   └── New-EAFVM.Unit.Tests.ps1
-│   │   └── Configuration-Monitoring.Tests.ps1
-│   │   └── Secure-Configuration.Tests.ps1
 │   ├── Integration.Real/          # True integration tests (target live Azure)
-│   │   └── New-EAFAppService.Integration.Tests.ps1 # (Template, more to be added)
-│   ├── Integration/               # Old mock-based "integration" tests (to be refactored/removed)
+│   ├── Integration/               # Old mock-based "integration" tests
 │   ├── Mocks/                     # Mocking modules for unit tests
 │   └── Run-Tests.ps1              # Script to execute Pester tests
 └── README.md                      # This file
 ```
+(Other supporting files like `LICENSE` would also be at the root or in standard locations.)
 
 ## Prerequisites
 
@@ -82,12 +78,15 @@ EAF.AzureProvisioning/
 1.  **Clone the Repository:**
     ```bash
     git clone <repository-url>
-    cd EAF.AzureProvisioning
     ```
 2.  **Import the Module:**
+    To use the module from the cloned repository, you can import it directly by pointing to the module manifest file within the `EAF.AzureProvisioning` directory:
     ```powershell
-    Import-Module ./EAF.AzureProvisioning.psd1
+    # Assuming your current location is the root of the cloned repository:
+    Import-Module ./EAF.AzureProvisioning/EAF.AzureProvisioning.psd1
     ```
+    Alternatively, for more permanent installation, you can copy the entire `EAF.AzureProvisioning` folder to one of your PowerShell module paths (e.g., `$env:PSModulePath`).
+
 3.  **Use the Cmdlets:**
     ```powershell
     # Example: Deploying a new Key Vault
