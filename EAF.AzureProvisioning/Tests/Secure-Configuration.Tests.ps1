@@ -144,38 +144,3 @@ Describe "Secure Configuration Tests" {
         }
     }
 }
-
-AFSecureConfiguration -ConfigPath "" `
-                -SecureValue $script:testSecureString } | Should -Throw
-
-            { Set-EAFSecureConfiguration -ConfigPath $script:testConfigPath `
-                -SecureValue $null } | Should -Throw
-        }
-
-        It "Should handle operation timeouts" {
-            # Arrange - Mock Set-AzKeyVaultSecret to simulate timeout
-            Mock Set-AzKeyVaultSecret -ModuleName "Az.KeyVault.Mocks" {
-                Start-Sleep -Seconds 5
-                throw "Operation timed out"
-            }
-
-            # Act & Assert
-            { Set-EAFSecureConfiguration -ConfigPath $script:testConfigPath `
-                -SecureValue $script:testSecureString `
-                -KeyVaultName $script:testKeyVaultName } | Should -Throw
-        }
-
-        It "Should handle concurrent access" {
-            # Arrange
-            $jobs = 1..3 | ForEach-Object {
-                Start-Job -ScriptBlock {
-                    param($Path, $Value, $VaultName)
-                    Set-EAFSecureConfiguration -ConfigPath $Path -SecureValue $Value -KeyVaultName $VaultName
-                } -ArgumentList $script:testConfigPath, $script:testSecureString, $script:testKeyVaultName
-            }
-
-            # Act & Assert
-            { $jobs | Wait-Job | Receive-Job } | Should -Not -Throw
-        }
-    }
-}

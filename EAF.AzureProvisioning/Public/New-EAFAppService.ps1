@@ -113,6 +113,9 @@ function New-EAFAppService {
     
     .PARAMETER BackupRetentionPeriodDays
         Specifies the number of days to retain backups. Range: 1-365. Defaults to 30.
+
+    .PARAMETER BackupSasTokenExpiryPeriod
+        Specifies the SAS token expiry period for App Service backups, in ISO 8601 duration format (e.g., 'P1Y' for 1 year, 'P30D' for 30 days). Defaults to 'P1Y'.
     
     .PARAMETER Environment
         Specifies the deployment environment (dev, test, prod). Defaults to dev.
@@ -134,42 +137,9 @@ function New-EAFAppService {
         Creates a new Node.js App Service with two deployment slots named "staging" and "qa".
     
     .EXAMPLE
-        New-EAFAppService -ResourceGroupName "rg-webapps-prod" -AppServiceName "app-api-prod" -Department "IT" -EnableAutoScale $true -AutoScaleMinInstanceCount 2 -AutoScaleMaxInstanceCount 10 -CpuPercentageScaleOut 75
+        New-EAFAppService -ResourceGroupName "rg-webapps-prod" -AppServiceName "app-api-prod" -Department "IT" -EnableBackup $true -BackupSasTokenExpiryPeriod "P90D"
         
-        Creates a new App Service with auto-scaling configured to scale between 2 and 10 instances based on CPU usage.
-    
-    .EXAMPLE
-        $securePassword = ConvertTo-SecureString "MyRegistryPassword" -AsPlainText -Force
-        New-EAFAppService -ResourceGroupName "rg-webapps-dev" -AppServiceName "app-container-dev" -Department "DevOps" -EnableContainerDeployment $true -ContainerRegistryServer "myregistry.azurecr.io" -ContainerRegistryUsername "myusername" -ContainerRegistryPassword $securePassword -ContainerImageAndTag "myapp:latest"
-        
-        Creates a new App Service configured for container deployment using a specific container image.
-    
-    .EXAMPLE
-        New-EAFAppService -ResourceGroupName "rg-webapps-prod" -AppServiceName "app-public-prod" -Department "Marketing" -EnableCustomDomain $true -CustomDomainName "api.contoso.com" -EnableSslBinding $true -SslCertificateThumbprint "ABCDEF1234567890ABCDEF1234567890ABCDEF12"
-        
-        Creates a new App Service with a custom domain and SSL binding.
-    
-    .EXAMPLE
-        New-EAFAppService -ResourceGroupName "rg-webapps-test" -AppServiceName "app-api-test" -SkuName "P1v2" -RuntimeStack "node" -RuntimeVersion "16" -Department "Marketing" -Environment "test"
-        
-        Creates a new Node.js App Service in the test environment with a Premium v2 SKU.
-    
-    .EXAMPLE
-        $appParams = @{
-            ResourceGroupName = "rg-webapps-prod"
-            AppServiceName = "app-api-prod"
-            SkuName = "P2v2"
-            SkuCapacity = 2
-            RuntimeStack = "dotnet"
-            RuntimeVersion = "6.0"
-            Department = "Finance"
-            Environment = "prod"
-            HttpsOnly = $true
-            AlwaysOn = $true
-        }
-        New-EAFAppService @appParams
-        
-        Creates a new production .NET 6 App Service using splatting for parameters.
+        Creates a new App Service in production with backups enabled and SAS tokens for backup storage expiring in 90 days.
     
     .INPUTS
         None. You cannot pipe objects to New-EAFAppService.
@@ -180,7 +150,7 @@ function New-EAFAppService {
     .NOTES
         Requires Az PowerShell modules.
         Author: EAF Team
-        Version: 1.0
+        Version: 1.1
     #>
     [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     param (
@@ -298,6 +268,10 @@ function New-EAFAppService {
         [Parameter(Mandatory = $false)]
         [ValidateRange(1, 365)]
         [int]$BackupRetentionPeriodDays = 30,
+
+        [Parameter(Mandatory = $false)]
+        [ValidateNotNullOrEmpty()]
+        [string]$BackupSasTokenExpiryPeriod = 'P1Y', # Default to 1 year
         
         [ValidateSet('dev', 'test', 'prod')]
         [string]$Environment = 'dev',
@@ -587,6 +561,7 @@ function New-EAFAppService {
                 backupStorageContainerName = $BackupStorageContainerName
                 backupSchedule = $BackupSchedule
                 backupRetentionPeriodDays = $BackupRetentionPeriodDays
+                backupSasTokenExpiryPeriod = $BackupSasTokenExpiryPeriod # New parameter added here
             }
             
             # Step 5: Deploy App Service using Bicep template
@@ -667,6 +642,7 @@ function New-EAFAppService {
                         BackupEnabled = $EnableBackup -and $deployment.Outputs.backupEnabled.Value
                         BackupStorageAccount = if ($EnableBackup) { $BackupStorageAccountName } else { '' }
                         BackupRetentionDays = if ($EnableBackup) { $BackupRetentionPeriodDays } else { 0 }
+                        BackupSasTokenExpiryPeriod = if ($EnableBackup) { $BackupSasTokenExpiryPeriod } else { '' } # Added to output
                         
                         # General deployment details
                         ProvisioningState = $appService.State

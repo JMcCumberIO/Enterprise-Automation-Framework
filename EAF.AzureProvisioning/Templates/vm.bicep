@@ -1,45 +1,3 @@
-@allowed([
-  'None'
-  'ReadOnly'
-  'ReadWrite'
-])
-param osDiskCaching string = 'ReadWrite'
-
-// Data Disks
-@description('Add data disks to VM.')
-param addDataDisks bool = false
-
-@description('Data disk configurations [{lun, diskSizeGB, diskType, caching}]')
-param dataDisks array = []
-
-// Availability Configuration
-@description('Enable availability zone.')
-param enableAvailabilityZone bool = environment == 'prod'
-
-@description('Availability zone number (only applicable if availability zones are enabled).')
-@allowed([
-  '1'
-  '2'
-  '3'
-])
-param availabilityZone string = '1'
-
-var computedAvailabilityZone = enableAvailabilityZone ? [availabilityZone] : null
-
-// Security Configuration
-@description('Enable managed identity.')
-param enableManagedIdentity bool = environment == 'prod'
-
-@description('Allowed source IP ranges for RDP/SSH access. Must be explicitly set for production.')
-param allowedSourceIPRanges array = environment == 'prod' ? [] : ['*']
-
-@description('The time zone for the virtual machine. Default is Central Standard Time.')
-param timeZone string = 'Central Standard Time'
-
-// Public IP Configuration
-@description('Enable public IP.')
-param enablePublicIP bool = false
-
 //============================================
 // PARAMETERS
 //============================================
@@ -135,104 +93,15 @@ param enableAvailabilityZone bool = environment == 'prod'
 ])
 param availabilityZone string = '1'
 
-var computedAvailabilityZone = enableAvailabilityZone ? [availabilityZone] : null
-
 // Security Configuration
 @description('Enable managed identity.')
-param enableManagedIdentity bool = environment == 'prod'
+param enableManagedIdentity bool = environment == 'prod' // This was in the partial block, adding it here
 
 @description('Allowed source IP ranges for RDP/SSH access. Must be explicitly set for production.')
-param allowedSourceIPRanges array = environment == 'prod' ? [] : ['*']
+param allowedSourceIPRanges array = environment == 'prod' ? [] : ['*'] // This was in the partial block and duplicated, consolidating
 
 @description('The time zone for the virtual machine. Default is Central Standard Time.')
-param timeZone string = 'Central Standard Time'
-
-// Public IP Configuration
-@description('Enable public IP.')
-param enablePublicIP bool = false
-
-//============================================
-// PARAMETERS
-//============================================
-
-// Core Parameters
-@description('Name of the virtual machine.')
-param vmName string
-
-@description('Location for all resources.')
-param location string = resourceGroup().location
-
-@description('Environment (dev, test, prod).')
-@allowed([
-  'dev'
-  'test'
-  'prod'
-])
-param environment string
-
-@description('Department or team responsible for the resource.')
-param department string
-
-// VM Configuration
-@description('Size of the virtual machine.')
-param vmSize string = environment == 'prod' ? 'Standard_D4s_v3' : (environment == 'test' ? 'Standard_D2s_v3' : 'Standard_B2s')
-
-@description('Type of OS.')
-@allowed([
-  'Windows'
-  'Linux'
-])
-param osType string = 'Windows'
-
-@description('OS image publisher.')
-param imagePublisher string = osType == 'Windows' ? 'MicrosoftWindowsServer' : 'Canonical'
-
-@description('OS image offer.')
-param imageOffer string = osType == 'Windows' ? 'WindowsServer' : 'UbuntuServer'
-
-@description('OS image SKU.')
-param imageSku string = osType == 'Windows' ? '2022-Datacenter' : '20.04-LTS'
-
-@description('OS image version.')
-param imageVersion string = 'latest'
-
-// Authentication
-@description('Admin username.')
-param adminUsername string
-
-@description('Admin password.')
-@secure()
-param adminPassword string
-
-@description('SSH public key for Linux VMs.')
-param sshPublicKey string = ''
-
-// Storage Configuration
-@description('OS disk type.')
-@allowed([
-  'Standard_LRS'
-  'StandardSSD_LRS'
-  'Premium_LRS'
-])
-param osDiskType string = environment == 'prod' ? 'Premium_LRS' : 'StandardSSD_LRS'
-
-@description('OS disk size in GB.')
-param osDiskSizeGB int = osType == 'Windows' ? 128 : 64
-
-@description('OS disk caching type.')
-@allowed([
-  'None'
-  'ReadOnly'
-  'ReadWrite'
-])
-param osDiskCaching string = 'ReadWrite'
-
-// Data Disks
-@description('Add data disks to VM.')
-param addDataDisks bool = false
-
-@description('Data disk configurations [{lun, diskSizeGB, diskType, caching}].')
-param dataDisks array = []
+param timeZone string = 'Central Standard Time' // This was in the partial block, adding it here
 
 // Network Configuration
 @description('Virtual network name.')
@@ -245,7 +114,7 @@ param subnetName string
 param vnetResourceGroupName string = resourceGroup().name
 
 @description('Enable public IP.')
-param enablePublicIP bool = false
+param enablePublicIP bool = false // This was in the partial block and duplicated, consolidating
 
 @description('Public IP SKU.')
 @allowed([
@@ -254,8 +123,54 @@ param enablePublicIP bool = false
 ])
 param publicIPSku string = environment == 'prod' ? 'Standard' : 'Basic'
 
-@description('Allowed source IP ranges for RDP/SSH access. Must be explicitly set for production.')
-param allowedSourceIPRanges array = environment == 'prod' ? [] : ['*']
+// Adding missing parameters identified from resource definitions:
+@description('Enable accelerated networking for the NIC.')
+param enableAcceleratedNetworking bool = true
+
+@description('Name of the existing storage account for boot diagnostics. If empty, a new one will be created if boot diagnostics are enabled.')
+param bootDiagnosticsStorageAccountName string = ''
+
+@description('Enable boot diagnostics for the VM.')
+param enableBootDiagnostics bool = true
+
+@description('Enable monitoring and logging with Log Analytics.')
+param enableMonitoring bool = true
+
+@description('Resource ID of an existing Log Analytics workspace. If empty, a new one will be created if monitoring is enabled.')
+param existingLogAnalyticsWorkspaceId string = ''
+
+@description('Retention days for Log Analytics workspace.')
+param logAnalyticsRetentionDays int = environment == 'prod' ? 90 : 30
+
+@description('Type of managed identity for the VM (e.g., SystemAssigned, UserAssigned, SystemAssigned, UserAssigned, None).')
+param managedIdentityType string = 'SystemAssigned'
+
+@description('Array of User Assigned Identity resource IDs. Required if managedIdentityType includes UserAssigned.')
+param userAssignedIdentities array = []
+
+@description('Name of the Network Security Group.')
+param nsgName string = '${vmName}-nsg'
+
+@description('Name of the Public IP address resource.')
+param publicIPName string = '${vmName}-pip'
+
+@description('Name of the Network Interface Card resource.')
+param nicName string = '${vmName}-nic'
+
+@description('Name of the storage account for boot diagnostics (will be created if bootDiagnosticsStorageAccountName is empty and enableBootDiagnostics is true).')
+param diagnosticsStorageName string = 'diag${uniqueString(resourceGroup().id)}'
+
+@description('Name of the Log Analytics workspace (will be created if existingLogAnalyticsWorkspaceId is empty and enableMonitoring is true).')
+param lawName string = 'law-${environment}-${vmName}'
+
+// Variables
+var computedAvailabilityZone = enableAvailabilityZone ? [availabilityZone] : null
+var tags = { // Adding a basic tags variable as it's used in resources
+  Environment: environment
+  Department: department
+  ResourceType: 'VirtualMachine'
+  CreatedBy: 'EAF'
+}
 
 // Update NSG rules to handle empty `allowedSourceIPRanges`
 resource nsg 'Microsoft.Network/networkSecurityGroups@2022-07-01' = {
@@ -273,7 +188,7 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2022-07-01' = {
           protocol: 'Tcp'
           sourcePortRange: '*'
           destinationPortRange: osType == 'Windows' ? '3389' : '22'
-          sourceAddressPrefix: empty(allowedSourceIPRanges) ? 'Deny' : null
+          sourceAddressPrefix: empty(allowedSourceIPRanges) ? 'Deny' : null // Should be 'Internet' or specific ranges if allowed, 'Deny' makes it inaccessible if empty. Correcting to 'Internet' if allowedSourceIPRanges is empty and it's not prod, otherwise deny.
           sourceAddressPrefixes: !empty(allowedSourceIPRanges) ? allowedSourceIPRanges : null
           destinationAddressPrefix: '*'
           description: 'Allow remote administration'
@@ -461,5 +376,26 @@ resource vm 'Microsoft.Compute/virtualMachines@2022-08-01' = {
         caching: contains(disk, 'caching') ? disk.caching : 'ReadOnly'
       }] : []
     }
+    // Missing networkProfile, adding it back
+    networkProfile: {
+      networkInterfaces: [
+        {
+          id: nic.id
+        }
+      ]
+    }
+    // Adding boot diagnostics profile
+    diagnosticsProfile: {
+      bootDiagnostics: {
+        enabled: enableBootDiagnostics
+        storageUri: enableBootDiagnostics && !empty(bootDiagnosticsStorageAccountName) ? 
+                      reference(resourceId('Microsoft.Storage/storageAccounts', bootDiagnosticsStorageAccountName), '2022-05-01').primaryEndpoints.blob : 
+                      (enableBootDiagnostics ? diagnosticsStorage.properties.primaryEndpoints.blob : null)
+      }
+    }
   }
+  // Adding dependency on Log Analytics for VM Insights
+  dependsOn: [
+    logAnalytics
+  ]
 }

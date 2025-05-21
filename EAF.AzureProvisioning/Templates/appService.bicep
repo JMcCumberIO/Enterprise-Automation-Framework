@@ -132,6 +132,9 @@ param backupSchedule string = '0 0 * * *'
 @maxValue(365)
 param backupRetentionPeriodDays int = 30
 
+@description('SAS token expiry period for App Service backups. ISO 8601 duration format, e.g., P1Y for 1 year, P30D for 30 days.')
+param backupSasTokenExpiryPeriod string = 'P1Y'
+
 @description('Environment (dev, test, prod).')
 @allowed([
   'dev'
@@ -379,18 +382,20 @@ resource backupConfiguration 'Microsoft.Web/sites/config@2021-02-01' = if (enabl
       frequencyUnit: 'Day'
       keepAtLeastOneBackup: true
       retentionPeriodInDays: backupRetentionPeriodDays
-      startTime: dateTimeAdd(utcNow(), 'PT1H')
+      startTime: dateTimeAdd(utcNow(), 'PT1H') // Schedule backup to start in 1 hour from deployment time
     }
     enabled: true
     storageAccountUrl: 'https://${backupStorageAccountName}.blob.${environment().suffixes.storage}/${backupStorageContainerName}?${listAccountSas(resourceId('Microsoft.Storage/storageAccounts', backupStorageAccountName), '2021-04-01', {
-      signedServices: 'b'
-      signedResourceTypes: 'sco'
-      signedPermission: 'rwdl'
-      signedExpiry: dateTimeAdd(utcNow(), 'P10Y')
+      signedServices: 'b' // Blob service
+      signedResourceTypes: 'sco' // Service, Container, Object
+      signedPermission: 'rwdl' // Read, Write, Delete, List
+      signedExpiry: dateTimeAdd(utcNow(), backupSasTokenExpiryPeriod) // Use the new parameter for expiry
     }).accountSasToken}'
   }
   dependsOn: [
     appService
+    // Ensure storage account exists if we were to create it in this template, 
+    // but here we assume it's pre-existing or managed elsewhere.
   ]
 }
 

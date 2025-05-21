@@ -1,167 +1,3 @@
-@description('Name of the storage account.')
-param storageAccountName string
-
-@description('Location for all resources.')
-param location string = resourceGroup().location
-
-@description('Storage Account type.')
-@allowed([
-  'StorageV2'
-  'BlockBlobStorage'
-  'FileStorage'
-])
-param storageAccountType string = 'StorageV2'
-
-@description('Storage Account access tier.')
-@allowed([
-  'Hot'
-  'Cool'
-])
-param accessTier string = 'Hot'
-
-@description('Storage Account replication type.')
-@allowed([
-  'Standard_LRS'
-  'Standard_GRS'
-  'Standard_RAGRS'
-  'Standard_ZRS'
-  'Premium_LRS'
-  'Premium_ZRS'
-])
-param sku string = 'Standard_LRS'
-
-@description('Enable blob versioning.')
-param enableBlobVersioning bool = true
-
-@description('Enable soft delete for blobs.')
-param enableBlobSoftDelete bool = true
-
-@description('Retention days for blob soft delete.')
-@minValue(1)
-@maxValue(365)
-param blobSoftDeleteRetentionDays int = 7
-
-@description('Enable soft delete for file shares.')
-param enableFileSoftDelete bool = true
-
-@description('Retention days for file share soft delete.')
-@minValue(1)
-@maxValue(365)
-param fileSoftDeleteRetentionDays int = 7
-
-@description('Enable hierarchical namespace (Data Lake Storage).')
-param enableHierarchicalNamespace bool = false
-
-@description('Enable blob public access.')
-param allowBlobPublicAccess bool = false
-
-@description('Enable shared key access.')
-param allowSharedKeyAccess bool = true
-
-@description('Require secure transfer (HTTPS).')
-param supportsHttpsTrafficOnly bool = true
-
-@description('Minimum TLS version.')
-@allowed([
-  'TLS1_0'
-  'TLS1_1'
-  'TLS1_2'
-])
-param minimumTlsVersion string = 'TLS1_2'
-
-@description('Enable static website hosting.')
-param enableStaticWebsite bool = false
-
-@description('Index document for static website.')
-param indexDocument string = 'index.html'
-
-@description('Error document for static website.')
-param errorDocument string = 'error.html'
-
-@description('Enable CORS for blob service.')
-param enableCors bool = false
-
-@description('Allowed origins for CORS.')
-param corsAllowedOrigins array = ['*']
-
-@description('Allowed methods for CORS.')
-param corsAllowedMethods array = ['GET', 'HEAD', 'POST', 'PUT', 'DELETE']
-
-@description('Allowed headers for CORS.')
-param corsAllowedHeaders array = ['*']
-
-@description('Exposed headers for CORS.')
-param corsExposedHeaders array = ['*']
-
-@description('Maximum age in seconds for CORS.')
-param corsMaxAgeInSeconds int = 200
-
-@description('Enable immutable storage with time-based retention policy.')
-param enableImmutableStorage bool = false
-
-@description('Immutable storage retention period in days.')
-@minValue(1)
-@maxValue(146000)
-param immutableRetentionPeriodInDays int = 365
-
-@description('Enable lifecycle management.')
-param enableLifecycleManagement bool = false
-
-@description('Days after which to move blobs to cool tier.')
-@minValue(0)
-@maxValue(99999)
-param daysToCoolTier int = 30
-
-@description('Days after which to move blobs to archive tier.')
-@minValue(0)
-@maxValue(99999)
-param daysToArchiveTier int = 90
-
-@description('Days after which to delete blobs.')
-@minValue(0)
-@maxValue(99999)
-param daysToDeleteBlobs int = 365
-
-@description('Enable queue analytics.')
-param enableQueueAnalytics bool = false
-
-@description('Enable table analytics.')
-param enableTableAnalytics bool = false
-
-@description('Default action for the Queue service.')
-@allowed([
-  'Allow'
-  'Deny'
-])
-param queueNetworkAclDefaultAction string = 'Deny'
-
-@description('Default action for the Table service.')
-@allowed([
-  'Allow'
-  'Deny'
-])
-param tableNetworkAclDefaultAction string = 'Deny'
-@description('Allow access from all networks.')
-param allowAllNetworks bool = false
-
-@description('Array of allowed virtual network subnet resource ids.')
-param allowedVirtualNetworkSubnetIds array = []
-
-@description('Array of allowed IP address ranges.')
-param allowedIpAddressRanges array = []
-
-@description('Deploy private endpoint.')
-param deployPrivateEndpoint bool = false
-
-@description('Virtual network name for private endpoint.')
-param privateEndpointVirtualNetworkName string = ''
-
-@description('Subnet name for private endpoint.')
-param privateEndpointSubnetName string = ''
-
-@description('Resource group of the virtual network for private endpoint.')
-param privateEndpointVnetResourceGroup string = resourceGroup().name
-
 // =========================================================
 // Storage Account Template - Enterprise Azure Framework (EAF)
 // =========================================================
@@ -260,7 +96,22 @@ param enableBlobSoftDelete bool = true
 @description('Blob soft delete retention days')
 @minValue(1)
 @maxValue(365)
-param blobSoftDeleteRetentionDays i// Network Configuration
+param blobSoftDeleteRetentionDays int = 7 // Restored from interruption
+
+@description('Enable container soft delete') // Assuming this was meant to be container soft delete
+@minValue(1)
+@maxValue(365)
+param containerSoftDeleteRetentionDays int = environment == 'prod' ? 30 : 7
+
+@description('Enable file share soft delete')
+param enableFileSoftDelete bool = true
+
+@description('File share soft delete retention days')
+@minValue(1)
+@maxValue(365)
+param fileSoftDeleteRetentionDays int = environment == 'prod' ? 30 : 7 // Restored from interruption and assumed value
+
+// Network Configuration
 @description('Default network action')
 @allowed([
   'Allow'
@@ -372,14 +223,3 @@ var tags = union({
 }, additionalTags)
 
 var lawName = empty(existingLogAnalyticsWorkspaceId) ? '${environment}-${department}-law' : ''
-ue(1)
-@maxValue(365)
-param containerSoftDeleteRetentionDays int = environment == 'prod' ? 30 : 7
-
-@description('Enable file share soft delete')
-param enableFileSoftDelete bool = true
-
-@description('File share soft delete retention days')
-@minValue(1)
-@maxValue(365)
-param fileSoftDeleteRetentionDays int = environment == 'prod'// Storage
