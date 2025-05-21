@@ -61,11 +61,35 @@ param accessPolicies array = []
 @description('Principal ID for Key Vault Administrator role assignment. Only used when RBAC authorization is enabled.')
 param keyVaultAdministratorPrincipalId string = ''
 
+@description('Principal type for Key Vault Administrator role assignment.')
+@allowed([
+  'User'
+  'Group'
+  'ServicePrincipal'
+])
+param keyVaultAdministratorPrincipalType string = 'ServicePrincipal'
+
 @description('Principal ID for Key Vault Secrets User role assignment. Only used when RBAC authorization is enabled.')
 param keyVaultSecretsUserPrincipalId string = ''
 
+@description('Principal type for Key Vault Secrets User role assignment.')
+@allowed([
+  'User'
+  'Group'
+  'ServicePrincipal'
+])
+param keyVaultSecretsUserPrincipalType string = 'ServicePrincipal'
+
 @description('Principal ID for Key Vault Certificates Officer role assignment. Only used when RBAC authorization is enabled.')
 param keyVaultCertificatesOfficerPrincipalId string = ''
+
+@description('Principal type for Key Vault Certificates Officer role assignment.')
+@allowed([
+  'User'
+  'Group'
+  'ServicePrincipal'
+])
+param keyVaultCertificatesOfficerPrincipalType string = 'ServicePrincipal'
 
 // Network Configuration
 @description('Enable public network access to Key Vault.')
@@ -249,7 +273,7 @@ resource keyVaultAdminRoleAssignment 'Microsoft.Authorization/roleAssignments@20
   properties: {
     roleDefinitionId: keyVaultAdministratorRoleId
     principalId: keyVaultAdministratorPrincipalId
-    principalType: 'ServicePrincipal'
+    principalType: keyVaultAdministratorPrincipalType // Updated
   }
 }
 
@@ -259,7 +283,7 @@ resource keyVaultSecretsUserRoleAssignment 'Microsoft.Authorization/roleAssignme
   properties: {
     roleDefinitionId: keyVaultSecretsUserRoleId
     principalId: keyVaultSecretsUserPrincipalId
-    principalType: 'ServicePrincipal'
+    principalType: keyVaultSecretsUserPrincipalType // Updated
   }
 }
 
@@ -269,7 +293,7 @@ resource keyVaultCertificatesOfficerRoleAssignment 'Microsoft.Authorization/role
   properties: {
     roleDefinitionId: keyVaultCertificatesOfficerRoleId
     principalId: keyVaultCertificatesOfficerPrincipalId
-    principalType: 'ServicePrincipal'
+    principalType: keyVaultCertificatesOfficerPrincipalType // Updated
   }
 }
 
@@ -292,18 +316,18 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10
   }
 }
 
-// Application Insights for Monitoring
+// Application Insights for Monitoring (Optional, depends on if Key Vault itself needs App Insights or just LAW)
 resource appInsights 'Microsoft.Insights/components@2020-02-02' = if (enableMonitoring) {
   name: '${keyVaultName}-insights'
   location: location
   tags: resourceTags
-  kind: 'web'
+  kind: 'web' // Generic kind, can be 'other' if not web-related
   properties: {
-    Application_Type: 'web'
-    Request_Source: 'rest'
+    Application_Type: 'other' // Changed from 'web' as Key Vault is not a web app
+    Request_Source: 'rest' // Or other relevant source
     WorkspaceResourceId: empty(existingLogAnalyticsWorkspaceId) ? logAnalyticsWorkspace.id : existingLogAnalyticsWorkspaceId
-    DisableIpMasking: false
-    Flow_Type: 'Bluefield'
+    DisableIpMasking: false // Consider if IP masking is needed
+    Flow_Type: 'Bluefield' // Default, may not be relevant
     IngestionMode: 'LogAnalytics'
   }
 }
@@ -348,42 +372,96 @@ resource diagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-pr
 // Action Group for Alerts
 resource actionGroup 'Microsoft.Insights/actionGroups@2022-06-01' = if (enableMonitoring && enableAvailabilityAlerts && length(alertEmailAddresses) > 0) {
   name: '${keyVaultName}-ag'
-  location: 'global'
+  location: 'global' // Action groups are global
   tags: resourceTags
   properties: {
-    groupShortName: 'KVAlerts'
+    groupShortName: 'KVAlerts-${keyVaultName}' // More specific short name
     enabled: true
     emailReceivers: [for email in alertEmailAddresses: {
-      name: 'Email_${indexOf(alertEmailAddresses, email)}'
+      name: 'Email_${replace(email, '@', '_')}' // Create a valid name from email
       emailAddress: email
       useCommonAlertSchema: true
     }]
+    // Potentially add SMS or other receivers here if needed
   }
 }
 
-// Metric Alerts
-resource metricAlerts 'Microsoft.Insights/metricAlerts@2018-03-01' = if (enableMonitoring && enableAvailabilityAlerts) {
-  name: '${keyVaultName}-metrics'
+// Metric Alerts (Example: Availability and Latency)
+resource availabilityAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = if (enableMonitoring && enableAvailabilityAlerts) {
+  name: '${keyVaultName}-AvailabilityAlert'
+  location: 'global' // Alerts are global
+  tags: resourceTags
+  properties: {
+    description: 'Alert when Key Vault availability drops below threshold.'
+    severity: 1 // Critical
+    enabled: true
+    scopes: [ keyVault.id ]
+    evaluationFrequency: 'PT1M' // Evaluate every minute
+    windowSize: 'PT5M' // Over the last 5 minutes
+    criteria: {
+      'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
+      allOf: [
+        {
+          name: 'AvailabilityCriterion'
+          metricNamespace: 'Microsoft.KeyVault/vaults'
+          metricName: 'Availability'
+          operator: 'LessThan'
+          threshold: 99 // Alert if availability is less than 99%
+          timeAggregation: 'Average'
+          criterionType: 'StaticThresholdCriterion'
+        }
+      ]
+    }
+    actions: length(alertEmailAddresses) > 0 ? [
+      {
+        actionGroupId: actionGroup.id
+      }
+    ] : []
+  }
+}
+
+resource latencyAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = if (enableMonitoring && enableAvailabilityAlerts) {
+  name: '${keyVaultName}-LatencyAlert'
   location: 'global'
   tags: resourceTags
   properties: {
-    description: 'Key Vault metric alerts'
-    severity: 2
+    description: 'Alert when Key Vault API latency is high.'
+    severity: 2 // Warning
     enabled: true
-    scopes: [
-      keyVault.id
-    ]
+    scopes: [ keyVault.id ]
     evaluationFrequency: 'PT5M'
     windowSize: 'PT15M'
     criteria: {
-      'odata.type': 'Microsoft.Azure.Monitor.MultipleResourceMultipleMetricCriteria'
+      'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
       allOf: [
         {
-          name: 'HighLatency'
+          name: 'LatencyCriterion'
           metricNamespace: 'Microsoft.KeyVault/vaults'
           metricName: 'ServiceApiLatency'
           operator: 'GreaterThan'
-          threshold: environment == 'prod' ? 500 : 1000
+          threshold: environment == 'prod' ? 500 : 1000 // Example thresholds (ms)
           timeAggregation: 'Average'
-          criterionType: '
+          criterionType: 'StaticThresholdCriterion'
+        }
+      ]
+    }
+    actions: length(alertEmailAddresses) > 0 ? [
+      {
+        actionGroupId: actionGroup.id
+      }
+    ] : []
+  }
+}
 
+// Outputs
+output keyVaultId string = keyVault.id
+output keyVaultUri string = keyVault.properties.vaultUri
+output keyVaultName string = keyVault.name
+output keyVaultResourceId string = keyVault.id // Duplicate of keyVaultId, consider removing one
+output rbacEnabled bool = enableRbacAuthorization
+output softDeleteEnabled bool = enableSoftDelete
+output purgeProtectionEnabled bool = enablePurgeProtection
+output privateEndpointEnabled bool = enablePrivateEndpoint
+output monitoringEnabled bool = enableMonitoring
+output logAnalyticsWorkspaceName string = enableMonitoring && empty(existingLogAnalyticsWorkspaceId) ? logAnalyticsWorkspace.name : ''
+output appInsightsName string = enableMonitoring ? appInsights.name : ''

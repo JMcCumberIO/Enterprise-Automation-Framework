@@ -74,11 +74,26 @@ function New-EAFKeyVault {
     
     .PARAMETER AdminObjectId
         Specifies the Object ID of the AAD user, group, or service principal to grant admin permissions.
-        Required if RBAC or default access policy is enabled.
+        This is used for `keyVaultAdministratorPrincipalId` in Bicep.
+    
+    .PARAMETER KeyVaultAdministratorPrincipalType
+        Specifies the principal type for the Key Vault Administrator role. Valid values: User, Group, ServicePrincipal. Defaults to ServicePrincipal.
+
+    .PARAMETER KeyVaultSecretsUserPrincipalId
+        Specifies the Principal ID for the Key Vault Secrets User role assignment. If empty, the role is not assigned.
+        
+    .PARAMETER KeyVaultSecretsUserPrincipalType
+        Specifies the principal type for the Key Vault Secrets User role. Valid values: User, Group, ServicePrincipal. Defaults to ServicePrincipal.
+
+    .PARAMETER KeyVaultCertificatesOfficerPrincipalId
+        Specifies the Principal ID for the Key Vault Certificates Officer role assignment. If empty, the role is not assigned.
+
+    .PARAMETER KeyVaultCertificatesOfficerPrincipalType
+        Specifies the principal type for the Key Vault Certificates Officer role. Valid values: User, Group, ServicePrincipal. Defaults to ServicePrincipal.
     
     .PARAMETER DeployDefaultAccessPolicy
         Indicates whether to deploy a default access policy. Defaults to false.
-        Only applicable when RBAC authorization is disabled.
+        Only applicable when RBAC authorization is disabled. The AdminObjectId is used for this policy.
     
     .PARAMETER AccessPolicies
         Specifies an array of access policies to assign to the Key Vault.
@@ -110,43 +125,18 @@ function New-EAFKeyVault {
     .EXAMPLE
         New-EAFKeyVault -ResourceGroupName "rg-security-dev" -KeyVaultName "kv-app1-dev" -Department "IT" -AdminObjectId "00000000-0000-0000-0000-000000000000"
         
-        Creates a new Key Vault named "kv-app1-dev" in the resource group "rg-security-dev" with default settings and RBAC authorization.
+        Creates a new Key Vault named "kv-app1-dev" with default settings and RBAC authorization, assigning the AdminObjectId as Key Vault Administrator.
     
     .EXAMPLE
         New-EAFKeyVault -ResourceGroupName "rg-security-test" -KeyVaultName "kv-app1-test" -SkuName "premium" -EnableRbacAuthorization $false -DeployDefaultAccessPolicy $true -AdminObjectId "00000000-0000-0000-0000-000000000000" -Department "Finance" -Environment "test"
         
-        Creates a new premium Key Vault in the test environment with a default access policy.
+        Creates a new premium Key Vault in the test environment with a default access policy for AdminObjectId.
     
     .EXAMPLE
-        $secretsToAdd = @(
-            @{
-                name = "AppSecret"
-                value = "MySecretValue123!"
-                contentType = "text/plain"
-            },
-            @{
-                name = "DatabaseConnection"
-                value = "Server=myserver;Database=mydb;User Id=admin;Password=password;"
-            }
-        )
+        New-EAFKeyVault -ResourceGroupName "rg-app-prod" -KeyVaultName "kv-app-prod" -Department "AppTeam" -AdminObjectId "service-principal-object-id" -KeyVaultAdministratorPrincipalType "ServicePrincipal" -KeyVaultSecretsUserPrincipalId "user-object-id" -KeyVaultSecretsUserPrincipalType "User"
         
-        $kvParams = @{
-            ResourceGroupName = "rg-security-prod"
-            KeyVaultName = "kv-app1-prod"
-            SkuName = "premium"
-            Department = "Operations"
-            Environment = "prod"
-            PublicNetworkAccess = $false
-            DeployPrivateEndpoint = $true
-            PrivateEndpointVirtualNetworkName = "vnet-prod"
-            PrivateEndpointSubnetName = "subnet-services"
-            AdminObjectId = "00000000-0000-0000-0000-000000000000"
-            Secrets = $secretsToAdd
-        }
-        New-EAFKeyVault @kvParams
-        
-        Creates a new premium Key Vault in the production environment with private endpoint and initial secrets.
-    
+        Creates a Key Vault with RBAC, assigning a Service Principal as Admin and a User as Secrets User.
+
     .INPUTS
         None. You cannot pipe objects to New-EAFKeyVault.
     
@@ -156,7 +146,7 @@ function New-EAFKeyVault {
     .NOTES
         Requires Az PowerShell modules.
         Author: EAF Team
-        Version: 1.0
+        Version: 1.1
     #>
     [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     param (
@@ -224,8 +214,26 @@ function New-EAFKeyVault {
         [Parameter(Mandatory = $false)]
         [string]$PrivateEndpointVnetResourceGroup = '',
         
+        [Parameter(Mandatory = $false)] # Effectively keyVaultAdministratorPrincipalId
+        [string]$AdminObjectId = '', 
+
         [Parameter(Mandatory = $false)]
-        [string]$AdminObjectId = '',
+        [ValidateSet('User', 'Group', 'ServicePrincipal')]
+        [string]$KeyVaultAdministratorPrincipalType = 'ServicePrincipal',
+
+        [Parameter(Mandatory = $false)]
+        [string]$KeyVaultSecretsUserPrincipalId = '',
+
+        [Parameter(Mandatory = $false)]
+        [ValidateSet('User', 'Group', 'ServicePrincipal')]
+        [string]$KeyVaultSecretsUserPrincipalType = 'ServicePrincipal',
+
+        [Parameter(Mandatory = $false)]
+        [string]$KeyVaultCertificatesOfficerPrincipalId = '',
+
+        [Parameter(Mandatory = $false)]
+        [ValidateSet('User', 'Group', 'ServicePrincipal')]
+        [string]$KeyVaultCertificatesOfficerPrincipalType = 'ServicePrincipal',
         
         [Parameter(Mandatory = $false)]
         [bool]$DeployDefaultAccessPolicy = $false,
@@ -323,196 +331,72 @@ function New-EAFKeyVault {
             Write-Verbose "Validating parameters..."
             Write-Progress -Activity "Creating Azure Key Vault" -Status "Validating parameters" -PercentComplete 5
             
-            # Validate key vault name using our validation helper
             $keyVaultNameValid = Test-EAFResourceName -ResourceName $KeyVaultName -ResourceType "KeyVault" -Environment $Environment -ThrowOnInvalid $false
             if (-not $keyVaultNameValid) {
                 throw [EAFResourceValidationException]::new(
                     "Key Vault name '$KeyVaultName' does not follow EAF naming standards. Should be in format: kv-{name}-{env}",
-                    "KeyVault",
-                    $KeyVaultName,
-                    "NamingConvention",
-                    $KeyVaultName
+                    "KeyVault", $KeyVaultName, "NamingConvention", $KeyVaultName
                 )
             }
             
-            # Step 2: Verify resource group exists using our validation helper
+            # Step 2: Verify resource group
             Write-Verbose "Checking resource group $ResourceGroupName exists..."
             Write-Progress -Activity "Creating Azure Key Vault" -Status "Verifying resource group" -PercentComplete 10
+            Test-EAFResourceGroupExists -ResourceGroupName $ResourceGroupName -ThrowOnNotExist $true
             
-            $rgExists = Test-EAFResourceGroupExists -ResourceGroupName $ResourceGroupName -ThrowOnNotExist $true
-            
-            # Use resource group location if not specified
             if (-not $Location) {
-                # Try to get from config first
                 $configLocation = Get-EAFConfiguration -ConfigPath "Regions.Default.$Environment"
-                
-                if (-not [string]::IsNullOrEmpty($configLocation)) {
-                    $Location = $configLocation
-                    Write-Verbose "Using location from configuration: $Location"
-                }
-                else {
-                    # Fall back to resource group location
-                    $resourceGroup = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
-                    $Location = $resourceGroup.Location
-                    Write-Verbose "Using resource group location: $Location"
-                }
+                $Location = if (-not [string]::IsNullOrEmpty($configLocation)) { $configLocation } else { (Get-AzResourceGroup -Name $ResourceGroupName).Location }
+                Write-Verbose "Using location: $Location"
             }
             
-            # Step 3: Verify Admin Object ID is provided when required
-            Write-Verbose "Validating admin identity configuration..."
+            # Step 3: Validate AdminObjectId based on auth model
             Write-Progress -Activity "Creating Azure Key Vault" -Status "Validating configurations" -PercentComplete 15
-            
-            if ($EnableRbacAuthorization -and [string]::IsNullOrEmpty($AdminObjectId)) {
-                Write-Warning "RBAC authorization is enabled but no AdminObjectId provided. No default admin will be assigned."
+            if ($EnableRbacAuthorization -and [string]::IsNullOrEmpty($AdminObjectId) -and [string]::IsNullOrEmpty($KeyVaultSecretsUserPrincipalId) -and [string]::IsNullOrEmpty($KeyVaultCertificatesOfficerPrincipalId) ) {
+                Write-Warning "RBAC authorization is enabled but no Principal IDs provided for core roles (Administrator, Secrets User, Certificates Officer). Key Vault might be unmanageable initially through these roles."
             }
-            
             if (-not $EnableRbacAuthorization -and $DeployDefaultAccessPolicy -and [string]::IsNullOrEmpty($AdminObjectId)) {
-                throw [EAFResourceValidationException]::new(
-                    "When RBAC authorization is disabled and DeployDefaultAccessPolicy is true, AdminObjectId must be specified.",
-                    "KeyVault",
-                    $KeyVaultName,
-                    "AdminObjectId",
-                    "NotSpecified"
+                throw [EAFParameterValidationException]::new(
+                    "When RBAC is disabled and DeployDefaultAccessPolicy is true, AdminObjectId must be specified for the default policy.",
+                    "KeyVault", "AdminObjectId", "MissingParameter"
                 )
             }
-            
-            # Step 4: Check if Key Vault already exists (idempotency)
+
+            # Step 4: Idempotency check
             Write-Verbose "Checking if Key Vault $KeyVaultName already exists..."
             Write-Progress -Activity "Creating Azure Key Vault" -Status "Checking existing resources" -PercentComplete 20
-            
-            # Use retry logic for potential transient failures
-            $existingKeyVault = Invoke-WithRetry -ScriptBlock {
-                Get-AzKeyVault -ResourceGroupName $ResourceGroupName -VaultName $KeyVaultName -ErrorAction SilentlyContinue
-            } -MaxRetryCount 3 -ActivityName "Checking Key Vault existence"
+            $existingKeyVault = Invoke-WithRetry -ScriptBlock { Get-AzKeyVault -ResourceGroupName $ResourceGroupName -VaultName $KeyVaultName -ErrorAction SilentlyContinue } -MaxRetryCount 3 -ActivityName "Checking Key Vault existence"
             
             if ($existingKeyVault) {
-                Write-Verbose "Key Vault $KeyVaultName already exists"
-                
-                # Validate if purge protection can be modified
+                Write-Verbose "Key Vault $KeyVaultName already exists."
                 if ($existingKeyVault.EnablePurgeProtection -ne $EnablePurgeProtection -and $existingKeyVault.EnablePurgeProtection) {
-                    Write-Warning "Key Vault $KeyVaultName has purge protection enabled which cannot be disabled once set."
+                    Write-Warning "Key Vault $KeyVaultName has purge protection enabled which cannot be disabled."
                 }
-                
                 if (-not $Force -and -not $PSCmdlet.ShouldProcess($KeyVaultName, "Update existing Key Vault")) {
-                    Write-Output "Key Vault $KeyVaultName already exists. Use -Force to update or modify existing configuration."
-                    return $existingKeyVault
+                    Write-Output "Key Vault $KeyVaultName already exists. Use -Force to update."
+                    return $existingKeyVault # Consider standardizing output object
                 }
                 Write-Verbose "Proceeding with Key Vault update..."
             }
             
-            # Step 5: Validate private endpoint parameters if required
+            # Step 5: Private Endpoint Validation (Simplified as per previous cmdlets)
             if ($DeployPrivateEndpoint) {
                 Write-Verbose "Validating private endpoint parameters..."
                 Write-Progress -Activity "Creating Azure Key Vault" -Status "Validating network configuration" -PercentComplete 30
-                
                 if ([string]::IsNullOrEmpty($PrivateEndpointVirtualNetworkName) -or [string]::IsNullOrEmpty($PrivateEndpointSubnetName)) {
-                    throw "When DeployPrivateEndpoint is set to true, PrivateEndpointVirtualNetworkName and PrivateEndpointSubnetName must be specified."
+                    throw [EAFParameterValidationException]::new("PrivateEndpointVirtualNetworkName and PrivateEndpointSubnetName must be specified for private endpoint.", "KeyVault", "PrivateEndpoint", "MissingParameter")
                 }
-                
-                if ([string]::IsNullOrEmpty($PrivateEndpointVnetResourceGroup)) {
-                    $PrivateEndpointVnetResourceGroup = $ResourceGroupName
-                    Write-Verbose "Using key vault resource group for private endpoint VNet: $PrivateEndpointVnetResourceGroup"
-                }
-                
-                # Verify virtual network and subnet exist
-                try {
-                    $vnet = Get-AzVirtualNetwork -ResourceGroupName $PrivateEndpointVnetResourceGroup -Name $PrivateEndpointVirtualNetworkName -ErrorAction Stop
-                    $subnet = $vnet.Subnets | Where-Object { $_.Name -eq $PrivateEndpointSubnetName }
-                    
-                    if (-not $subnet) {
-                        throw "Subnet '$PrivateEndpointSubnetName' not found in virtual network '$PrivateEndpointVirtualNetworkName'."
-                    }
-                    
-                    # Verify subnet allows private endpoints
-                    if ($subnet.PrivateEndpointNetworkPolicies -eq 'Enabled') {
-                        Write-Warning "Subnet '$PrivateEndpointSubnetName' has private endpoint network policies enabled, which may block private endpoint creation."
-                    }
-                    
-                    Write-Verbose "Private endpoint network configuration validated successfully."
-                }
-                catch {
-                    throw "Failed to validate private endpoint network configuration: ${_}"
-                }
-            }
-            
-            # Step 5: Validate network configuration
-            Write-Verbose "Validating network access configuration..."
-            
-            if (-not $PublicNetworkAccess -and $NetworkAclDefaultAction -eq 'Deny' -and 
-                $AllowedVirtualNetworkSubnetIds.Count -eq 0 -and 
-                $AllowedIpAddressRanges.Count -eq 0 -and 
-                -not $DeployPrivateEndpoint) {
-                Write-Warning "Key Vault will not be accessible - public network access disabled, default action set to Deny, and no allowed networks or private endpoint configured."
-            }
-            
-            # Step 6: Validate secrets if provided
-            if ($Secrets.Count -gt 0) {
-                Write-Verbose "Validating secrets configuration..."
-                foreach ($secret in $Secrets) {
-                    if (-not $secret.ContainsKey('name') -or -not $secret.ContainsKey('value')) {
-                        throw "All secrets must contain 'name' and 'value' properties."
-                    }
-                    
-                    # Check if secrets contain sensitive information in plaintext (basic check)
-                    if ($secret.ContainsKey('value') -and $secret.value -match '(?i)password|pwd|secret|key|token|credential') {
-                        Write-Warning "Secret '${secret.name}' appears to contain sensitive information. Ensure this is intentional and secure."
-                    }
-                }
-                Write-Verbose "Secrets validation complete."
+                $effectivePeRg = if ([string]::IsNullOrEmpty($PrivateEndpointVnetResourceGroup)) { $ResourceGroupName } else { $PrivateEndpointVnetResourceGroup }
+                Test-EAFNetworkConfiguration -VirtualNetworkName $PrivateEndpointVirtualNetworkName -SubnetName $PrivateEndpointSubnetName -ResourceGroupName $effectivePeRg -ThrowOnInvalid $true
             }
             
             # Step 7: Prepare deployment parameters
             Write-Verbose "Preparing deployment parameters..."
             Write-Progress -Activity "Creating Azure Key Vault" -Status "Preparing deployment" -PercentComplete 50
-            
-            $deploymentName = "Deploy-KeyVault-$KeyVaultName-$(Get-Date -Format 'yyyyMMddHHmmss')"
-            
-            $templateParams = @{
-                keyVaultName = $KeyVaultName
-                location = $Location
-                skuName = $SkuName
-                enableRbacAuthorization = $EnableRbacAuthorization
-                enableSoftDelete = $EnableSoftDelete
-                softDeleteRetentionInDays = $SoftDeleteRetentionInDays
-                enablePurgeProtection = $EnablePurgeProtection
-                enabledForTemplateDeployment = $EnabledForTemplateDeployment
-                enabledForDiskEncryption = $EnabledForDiskEncryption
-                enabledForDeployment = $EnabledForDeployment
-                publicNetworkAccess = $PublicNetworkAccess
-                networkAclDefaultAction = $NetworkAclDefaultAction
-                allowedVirtualNetworkSubnetIds = $AllowedVirtualNetworkSubnetIds
-                allowedIpAddressRanges = $AllowedIpAddressRanges
-                deployPrivateEndpoint = $DeployPrivateEndpoint
-                privateEndpointVirtualNetworkName = $PrivateEndpointVirtualNetworkName
-                privateEndpointSubnetName = $PrivateEndpointSubnetName
-                privateEndpointVnetResourceGroup = $PrivateEndpointVnetResourceGroup
-                adminObjectId = $AdminObjectId
-                deployDefaultAccessPolicy = $DeployDefaultAccessPolicy
-                accessPolicies = $AccessPolicies
-                secrets = $Secrets
-                environment = $Environment
-                department = $Department
-                dateCreated = $dateCreated
-            }
-            
-            # Step 8: Prepare deployment parameters
-            Write-Verbose "Preparing deployment parameters..."
-            Write-Progress -Activity "Creating Azure Key Vault" -Status "Preparing deployment" -PercentComplete 50
-            
-            # Use configuration helper to get default tags
             $defaultTags = Get-EAFDefaultTags -Environment $Environment -Department $Department -ResourceType "KeyVault"
-            
             $deploymentName = "Deploy-KeyVault-$KeyVaultName-$(Get-Date -Format 'yyyyMMddHHmmss')"
             
-            # Set retention days from configuration if not explicitly specified
-            if ($SoftDeleteRetentionInDays -eq 90) { # If using the default value
-                $configRetention = Get-EAFConfiguration -ConfigPath "Security.KeyVault.SoftDeleteRetention.$Environment"
-                if ($configRetention -gt 0) {
-                    $SoftDeleteRetentionInDays = $configRetention
-                    Write-Verbose "Using soft delete retention from configuration: $SoftDeleteRetentionInDays days"
-                }
-            }
-            
+            # Map PowerShell params to Bicep params, especially AdminObjectId to keyVaultAdministratorPrincipalId
             $templateParams = @{
                 keyVaultName = $KeyVaultName
                 location = $Location
@@ -531,189 +415,100 @@ function New-EAFKeyVault {
                 deployPrivateEndpoint = $DeployPrivateEndpoint
                 privateEndpointVirtualNetworkName = $PrivateEndpointVirtualNetworkName
                 privateEndpointSubnetName = $PrivateEndpointSubnetName
-                privateEndpointVnetResourceGroup = $PrivateEndpointVnetResourceGroup
-                adminObjectId = $AdminObjectId
-                deployDefaultAccessPolicy = $DeployDefaultAccessPolicy
-                accessPolicies = $AccessPolicies
-                secrets = $Secrets
+                privateEndpointVnetResourceGroup = if ($DeployPrivateEndpoint) { if ([string]::IsNullOrEmpty($PrivateEndpointVnetResourceGroup)) { $ResourceGroupName } else { $PrivateEndpointVnetResourceGroup } } else { '' }
+                
+                administratorObjectId = $AdminObjectId # For legacy access policy if RBAC is false
+                accessPolicies = $AccessPolicies # For legacy access policy if RBAC is false
+
+                keyVaultAdministratorPrincipalId = $AdminObjectId # Bicep uses this for the Admin role
+                keyVaultAdministratorPrincipalType = $KeyVaultAdministratorPrincipalType
+                keyVaultSecretsUserPrincipalId = $KeyVaultSecretsUserPrincipalId
+                keyVaultSecretsUserPrincipalType = $KeyVaultSecretsUserPrincipalType
+                keyVaultCertificatesOfficerPrincipalId = $KeyVaultCertificatesOfficerPrincipalId
+                keyVaultCertificatesOfficerPrincipalType = $KeyVaultCertificatesOfficerPrincipalType
+                
+                initialSecrets = $Secrets # Renamed from 'secrets' to 'initialSecrets' for clarity with Bicep
                 environment = $Environment
                 department = $Department
-                tags = $defaultTags
-                dateCreated = $dateCreated
+                additionalTags = $defaultTags # Bicep expects 'additionalTags'
+                dateCreated = $dateCreated # Added to align with Bicep
             }
             
-            # Step 9: Deploy Key Vault using Bicep template with retry logic
+            # Step 9: Deploy Key Vault using Bicep template
             if ($PSCmdlet.ShouldProcess($KeyVaultName, "Deploy Azure Key Vault")) {
                 Write-Verbose "Deploying Key Vault $KeyVaultName..."
                 Write-Progress -Activity "Creating Azure Key Vault" -Status "Deploying resources" -PercentComplete 70
                 
-                try {
-                    # Use retry logic for the deployment to handle transient failures
-                    $deployment = Invoke-WithRetry -ScriptBlock {
-                        New-AzResourceGroupDeployment `
-                            -ResourceGroupName $ResourceGroupName `
-                            -Name $deploymentName `
-                            -TemplateFile $templatePath `
-                            -TemplateParameterObject $templateParams `
-                            -ErrorAction Stop `
-                            -Verbose:$VerbosePreference
-                    } -MaxRetryCount 3 -ActivityName "Deploying Key Vault"
-                    
-                    Write-Progress -Activity "Creating Azure Key Vault" -Status "Deployment complete" -PercentComplete 90
-                    
-                    if ($deployment.ProvisioningState -ne 'Succeeded') {
-                        throw [EAFProvisioningFailedException]::new(
-                            "Key Vault deployment failed. Deployment state: $($deployment.ProvisioningState)",
-                            "KeyVault",
-                            $KeyVaultName,
-                            $deployment.ProvisioningState,
-                            $deployment.DeploymentName,
-                            ($deployment.Error | ConvertTo-Json -Compress)
-                        )
-                    }
-                    
-                    Write-Verbose "Key Vault $KeyVaultName deployed successfully"
-                    # Step 10: Set up diagnostic settings if enabled in configuration
-                    $enableDiagnostics = Get-EAFConfiguration -ConfigPath "Security.EnableDiagnostics.$Environment"
-                    if ($enableDiagnostics -ne $false) { # If null or true
-                        Write-Verbose "Setting up diagnostic settings for Key Vault $KeyVaultName..."
-                        Write-Progress -Activity "Creating Azure Key Vault" -Status "Configuring diagnostics" -PercentComplete 95
-                        
-                        try {
-                            # Get the Key Vault resource ID
-                            $keyVault = Get-AzKeyVault -ResourceGroupName $ResourceGroupName -VaultName $KeyVaultName
-                            $keyVaultResourceId = $keyVault.ResourceId
-                            
-                            # Use our monitoring helper to enable diagnostic settings
-                            Enable-EAFDiagnosticSettings `
-                                -ResourceId $keyVaultResourceId `
-                                -ResourceGroupName "rg-monitoring-$Environment" `
-                                -Categories @('AuditEvent', 'AllLogs') `
-                                -MetricCategories @('AllMetrics') `
-                                -Environment $Environment `
-                                -Department $Department
-                                
-                            Write-Verbose "Diagnostic settings configured successfully for Key Vault $KeyVaultName"
-                        }
-                        catch {
-                            # Log the error but don't fail the deployment
-                            Write-Warning "Failed to configure diagnostic settings for Key Vault $KeyVaultName: $($_.Exception.Message)"
-                        }
-                    }
-                    
-                    # Step 11: Get Key Vault details for return
-                    # Use retry logic for getting details to handle transient failures
-                    $keyVault = Invoke-WithRetry -ScriptBlock {
-                        Get-AzKeyVault -ResourceGroupName $ResourceGroupName -VaultName $KeyVaultName -ErrorAction Stop
-                    } -MaxRetryCount 3 -ActivityName "Getting Key Vault details"
-                    
-                    # Get any deployed secrets (just names, not values for security)
-                    $deployedSecrets = @()
-                    if ($Secrets.Count -gt 0) {
-                        try {
-                            $secretsList = Invoke-WithRetry -ScriptBlock {
-                                Get-AzKeyVaultSecret -VaultName $KeyVaultName -ErrorAction SilentlyContinue
-                            } -MaxRetryCount 3 -ActivityName "Getting Key Vault secrets"
-                            
-                            $deployedSecrets = $secretsList | Select-Object -ExpandProperty Name
-                        }
-                        catch {
-                            Write-Warning "Unable to retrieve secrets list: $($_.Exception.Message)"
-                        }
-                    }
-                    
-                    # Determine how the vault can be accessed
-                    $accessMethods = @()
-                    if ($PublicNetworkAccess) { $accessMethods += "Public Network" }
-                    if ($NetworkAclDefaultAction -eq 'Allow') { $accessMethods += "All Networks" }
-                    if ($AllowedIpAddressRanges.Count -gt 0) { $accessMethods += "Selected IP Ranges" }
-                    if ($AllowedVirtualNetworkSubnetIds.Count -gt 0) { $accessMethods += "Virtual Network Service Endpoints" }
-                    if ($DeployPrivateEndpoint) { $accessMethods += "Private Endpoint" }
-                    
-                    # Return custom object with deployment details
-                    $result = [PSCustomObject]@{
-                        Name = $keyVault.VaultName
-                        ResourceGroupName = $ResourceGroupName
-                        Location = $keyVault.Location
-                        VaultUri = $keyVault.VaultUri
-                        SkuName = $keyVault.Sku.Name
-                        TenantId = $keyVault.TenantId
-                        ResourceId = $keyVault.ResourceId
-                        EnableRbacAuthorization = $keyVault.EnableRbacAuthorization
-                        EnableSoftDelete = $keyVault.EnableSoftDelete
-                        SoftDeleteRetentionInDays = $keyVault.SoftDeleteRetentionInDays
-                        EnablePurgeProtection = $keyVault.EnablePurgeProtection
-                        AccessMethods = $accessMethods
-                        PrivateEndpoint = $DeployPrivateEndpoint
-                        DeployedSecrets = $deployedSecrets
-                        Environment = $Environment
-                        Department = $Department
-                        DeploymentTimestamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
-                    }
-                    
-                    Write-Verbose "Key Vault deployment completed successfully."
-                    Write-Progress -Activity "Creating Azure Key Vault" -Completed
-                    
-                    return $result
+                $deployment = Invoke-WithRetry -ScriptBlock {
+                    New-AzResourceGroupDeployment `
+                        -ResourceGroupName $ResourceGroupName `
+                        -Name $deploymentName `
+                        -TemplateFile $templatePath `
+                        -TemplateParameterObject $templateParams `
+                        -ErrorAction Stop `
+                        -Verbose:$VerbosePreference
+                } -MaxRetryCount 3 -ActivityName "Deploying Key Vault"
+                
+                Write-Progress -Activity "Creating Azure Key Vault" -Status "Deployment complete" -PercentComplete 90
+                
+                if ($deployment.ProvisioningState -ne 'Succeeded') {
+                    $errorDetails = $deployment.Properties.Error.Details | ForEach-Object Message | Out-String
+                    throw [EAFProvisioningFailedException]::new(
+                        "Key Vault deployment failed. State: $($deployment.ProvisioningState). Details: $errorDetails",
+                        "KeyVault", $KeyVaultName, $deployment.ProvisioningState, $deployment.CorrelationId
+                    )
                 }
-                catch {
-                    # Handle different types of exceptions with appropriate error messages
-                    if ($_.Exception -is [EAFProvisioningFailedException]) {
-                        Write-EAFException -Exception $_.Exception -ErrorCategory ResourceUnavailable -Throw
-                    }
-                    elseif ($_.Exception -is [EAFResourceValidationException] -or 
-                            $_.Exception -is [EAFNetworkConfigurationException] -or 
-                            $_.Exception -is [EAFDependencyException]) {
-                        Write-EAFException -Exception $_.Exception -Throw
-                    }
-                    else {
-                        throw [EAFProvisioningFailedException]::new(
-                            "Failed to deploy Key Vault $KeyVaultName. Error: $($_.Exception.Message)",
-                            "KeyVault",
-                            $KeyVaultName,
-                            "Failed",
-                            "Deployment",
-                            $_.Exception.Message
-                        )
-                    }
+                
+                Write-Verbose "KeyVault $KeyVaultName deployed successfully."
+                $keyVaultDetails = Get-AzKeyVault -ResourceGroupName $ResourceGroupName -VaultName $KeyVaultName
+                
+                $result = [PSCustomObject]@{
+                    Name = $keyVaultDetails.VaultName
+                    ResourceGroupName = $ResourceGroupName
+                    Location = $keyVaultDetails.Location
+                    VaultUri = $keyVaultDetails.VaultUri
+                    SkuName = $keyVaultDetails.Sku.Name
+                    EnableRbacAuthorization = $keyVaultDetails.EnableRbacAuthorization
+                    KeyVaultAdministratorPrincipalType = $KeyVaultAdministratorPrincipalType
+                    KeyVaultSecretsUserPrincipalType = $KeyVaultSecretsUserPrincipalType
+                    KeyVaultCertificatesOfficerPrincipalType = $KeyVaultCertificatesOfficerPrincipalType
+                    ProvisioningState = $deployment.ProvisioningState # Use deployment state
+                    DeploymentId = $deployment.DeploymentId
+                    DeploymentTimestamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+                    Tags = $keyVaultDetails.Tags
+                    KeyVaultReference = $keyVaultDetails
                 }
-            }
-            else {
-                Write-Verbose "Deployment skipped due to -WhatIf parameter."
-                Write-Progress -Activity "Creating Azure Key Vault" -Completed
+                Write-Progress -Activity "Creating Azure Key Vault" -Status "Completed" -PercentComplete 100
+                return $result
+            } else {
+                Write-Warning "Deployment of Key Vault $KeyVaultName skipped due to ShouldProcess preference."
+                return $null
             }
         }
         catch {
-            # Main error handling - ensure we write proper errors
+            Write-Progress -Activity "Creating Azure Key Vault" -Status "Error" -PercentComplete 100 -Completed
             if ($_.Exception -is [EAFException]) {
                 Write-EAFException -Exception $_.Exception -Throw
+            } else {
+                $wrappedException = [EAFProvisioningFailedException]::new(
+                    "Failed to create Key Vault '$KeyVaultName': $($_.Exception.Message)",
+                    "KeyVault", $KeyVaultName, "UnknownError", $null, $_.Exception 
+                )
+                Write-EAFException -Exception $wrappedException -Throw
             }
-            else {
-                Write-Error $_
-            }
-            Write-Progress -Activity "Creating Azure Key Vault" -Completed
         }
     }
     
     end {
-        # Clean up any resources
-        Write-Verbose "Cleaning up..."
-        
-        # Unload helper modules to avoid namespace conflicts
-        $helperModules = @(
-            "exceptions",
-            "retry-logic",
-            "validation-helpers",
-            "configuration-helpers",
-            "monitoring-helpers"
-        )
-        
-        foreach ($helperModule in $helperModules) {
-            if (Get-Module -Name $helperModule) {
-                Remove-Module -Name $helperModule -ErrorAction SilentlyContinue
+        Write-Verbose "New-EAFKeyVault operation finished."
+        if ($script:EAFHelperModulesLoaded) { # Check if modules were loaded in 'begin'
+            $helperModuleNames = @("exceptions", "retry-logic", "validation-helpers", "configuration-helpers", "monitoring-helpers")
+            foreach ($helperModuleName in $helperModuleNames) {
+                if (Get-Module -Name $helperModuleName -ErrorAction SilentlyContinue) {
+                    Remove-Module -Name $helperModuleName -ErrorAction SilentlyContinue
+                    Write-Verbose "Unloaded helper module: $helperModuleName"
+                }
             }
         }
-        
-        Write-Verbose "New-EAFKeyVault completed."
     }
 }
