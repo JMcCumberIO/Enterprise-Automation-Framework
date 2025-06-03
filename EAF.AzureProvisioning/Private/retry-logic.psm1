@@ -409,5 +409,52 @@ function Invoke-WithRetry {
     
 .EXAMPLE
     # Retry a resource deployment
-    $deployment = Invoke-AzCommandWithRetry -Command "New-AzResourceGroupDeployment" -
+    $deployment = Invoke-AzCommandWithRetry -Command "New-AzResourceGroupDeployment" -Parameters @{ \
+        ResourceGroupName = "mygroup" \
+        TemplateFile      = "template.bicep" \
+    } -MaxRetryCount 5
+
+#>
+
+function Invoke-AzCommandWithRetry {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Command,
+
+        [Parameter(Mandatory = $false)]
+        [hashtable]$Parameters = @{},
+
+        [Parameter(Mandatory = $false)]
+        [int]$MaxRetryCount = 3,
+
+        [Parameter(Mandatory = $false)]
+        [int]$BaseDelayMs = 1000,
+
+        [Parameter(Mandatory = $false)]
+        [int]$MaxDelayMs = 60000,
+
+        [Parameter(Mandatory = $false)]
+        [scriptblock]$RetryableErrorDetectionBlock,
+
+        [Parameter(Mandatory = $false)]
+        [switch]$ThrowOnLastError = $true
+    )
+
+    $scriptBlock = {
+        param($cmd, $params)
+        & $cmd @params
+    }
+
+    Invoke-WithRetry -ScriptBlock $scriptBlock `
+        -ArgumentList $Command, $Parameters `
+        -MaxRetryCount $MaxRetryCount `
+        -BaseDelayMs $BaseDelayMs `
+        -MaxDelayMs $MaxDelayMs `
+        -RetryableErrorDetectionBlock $RetryableErrorDetectionBlock `
+        -ThrowOnLastError:$ThrowOnLastError `
+        -ActivityName $Command
+}
+
+
 
