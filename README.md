@@ -148,4 +148,4 @@ Contributions are welcome! Please follow standard Git practices: fork, branch, c
 
 ## License
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+This project is licensed under the GLP v3 License. See the `LICENSE` file for details.
